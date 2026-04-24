@@ -1,0 +1,10 @@
+{
+  "name": "@airportmc-hwp/web-client",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node src/dev-server.js",
+    "start": "node src/dev-server.js"
+  }
+}

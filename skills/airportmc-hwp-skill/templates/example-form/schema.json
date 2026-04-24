@@ -1,0 +1,12 @@
+{
+  "templateId": "example-form",
+  "title": "Example AirportMC Form",
+  "sourcePath": "templates/example-form/template.hwp",
+  "fields": [
+    { "key": "name", "label": "성명", "required": true, "type": "text" },
+    { "key": "department", "label": "부서", "required": true, "type": "text" },
+    { "key": "date", "label": "일자", "required": true, "type": "date" },
+    { "key": "notes", "label": "비고", "required": false, "type": "text" }
+  ],
+  "mappingPath": "templates/example-form/mapping.json"
+}

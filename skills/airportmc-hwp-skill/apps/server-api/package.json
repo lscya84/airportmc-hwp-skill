@@ -1,0 +1,10 @@
+{
+  "name": "@airportmc-hwp/server-api",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node src/index.js",
+    "start": "node src/index.js"
+  }
+}

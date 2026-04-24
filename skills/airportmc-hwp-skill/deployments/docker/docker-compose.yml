@@ -1,0 +1,29 @@
+version: '3.9'
+services:
+  server-api:
+    image: node:22
+    working_dir: /app/apps/server-api
+    volumes:
+      - ../../:/app
+      - hwp_data:/data
+    command: sh -lc "node src/index.js"
+    environment:
+      PORT: 4000
+    ports:
+      - "4000:4000"
+
+  web-client:
+    image: node:22
+    working_dir: /app/apps/web-client
+    volumes:
+      - ../../:/app
+    command: sh -lc "node src/dev-server.js"
+    environment:
+      PORT: 3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - server-api
+
+volumes:
+  hwp_data:

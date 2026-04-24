@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AirportMC HWP Platform</title>
+    <style>
+      body { font-family: sans-serif; margin: 0; line-height: 1.5; }
+      .page { padding: 1.5rem; }
+      code { background: #f3f3f3; padding: 0.1rem 0.3rem; border-radius: 4px; }
+      .card { border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin-top: 1rem; }
+      button { padding: 0.6rem 1rem; margin-right: 0.5rem; }
+      pre { background: #111; color: #eee; padding: 1rem; border-radius: 8px; overflow: auto; }
+      .grid { display: grid; grid-template-columns: 120px 1fr; gap: 0.5rem; max-width: 600px; align-items: center; }
+      input { padding: 0.5rem; }
+      iframe { width: 100%; height: 80vh; border: 1px solid #ccc; border-radius: 8px; }
+      .row { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.75rem; }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <h1>AirportMC HWP Platform</h1>
+      <p>웹/앱 공용 문서 플랫폼 PoC 초기 화면입니다.</p>
+
+      <div class="card">
+        <h2>Template API test</h2>
+        <button id="loadTemplates">/templates 불러오기</button>
+        <pre id="templatesOutput">아직 요청하지 않았습니다.</pre>
+      </div>
+
+      <div class="card">
+        <h2>Example fill flow</h2>
+        <div class="grid">
+          <label for="name">성명</label><input id="name" value="이상천" />
+          <label for="department">부서</label><input id="department" value="기계사업소" />
+          <label for="date">일자</label><input id="date" value="2026-04-24" />
+          <label for="notes">비고</label><input id="notes" value="자동 작성 테스트" />
+        </div>
+        <p></p>
+        <button id="fillExample">example-form 채우기</button>
+        <pre id="fillOutput">아직 요청하지 않았습니다.</pre>
+      </div>
+
+      <div class="card">
+        <h2>rhwp editor embed PoC</h2>
+        <p>현재는 공개 demo studio를 iframe으로 붙이는 구조 검증 단계입니다.</p>
+        <div class="row">
+          <button id="mountRhwp">rhwp editor 붙이기</button>
+          <button id="loadPreviewDoc">예시 문서 로드</button>
+        </div>
+        <pre id="rhwpOutput">아직 초기화하지 않았습니다.</pre>
+        <div id="editorHost" style="margin-top:1rem;"></div>
+      </div>
+    </div>
+
+    <script type="module">
+      const templatesOutput = document.getElementById('templatesOutput');
+      const fillOutput = document.getElementById('fillOutput');
+      const rhwpOutput = document.getElementById('rhwpOutput');
+      const editorHost = document.getElementById('editorHost');
+      let editor = null;
+
+      async function createRhwpEditor(container, options = {}) {
+        const studioUrl = options.studioUrl || 'https://edwardkim.github.io/rhwp/';
+        const iframe = document.createElement('iframe');
+        iframe.src = studioUrl;
+        iframe.allow = 'clipboard-read; clipboard-write';
+        container.innerHTML = '';
+        container.appendChild(iframe);
+        await new Promise((resolve) => iframe.addEventListener('load', resolve, { once: true }));
+
+        let requestId = 0;
+        const pending = new Map();
+        function onMessage(e) {
+          if (e.source !== iframe.contentWindow) return;
+          if (e.data?.type === 'rhwp-response' && e.data.id != null) {
+            const item = pending.get(e.data.id);
+            if (item) {
+              pending.delete(e.data.id);
+              if (e.data.error) item.reject(new Error(e.data.error));
+              else item.resolve(e.data.result);
+            }
+          }
+        }
+        window.addEventListener('message', onMessage);
+
+        function request(method, params = {}) {
+          return new Promise((resolve, reject) => {
+            const id = ++requestId;
+            pending.set(id, { resolve, reject });
+            iframe.contentWindow.postMessage({ type: 'rhwp-request', id, method, params }, '*');
+            setTimeout(() => {
+              if (pending.has(id)) {
+                pending.delete(id);
+                reject(new Error('Request timeout: ' + method));
+              }
+            }, 15000);
+          });
+        }
+
+        for (let i = 0; i < 30; i++) {
+          try {
+            const ready = await request('ready');
+            if (ready) break;
+          } catch {}
+          await new Promise((r) => setTimeout(r, 500));
+        }
+
+        return {
+          iframe,
+          async loadTextAsFile(text, fileName = 'preview.txt') {
+            const encoder = new TextEncoder();
+            const bytes = Array.from(encoder.encode(text));
+            return request('loadFile', { data: bytes, fileName });
+          },
+          async pageCount() { return request('pageCount'); },
+          destroy() {
+            window.removeEventListener('message', onMessage);
+            iframe.remove();
+            pending.clear();
+          }
+        };
+      }
+
+      document.getElementById('loadTemplates').addEventListener('click', async () => {
+        templatesOutput.textContent = '불러오는 중...';
+        try {
+          const res = await fetch('http://localhost:4000/templates');
+          const json = await res.json();
+          templatesOutput.textContent = JSON.stringify(json, null, 2);
+        } catch (err) {
+          templatesOutput.textContent = 'API 호출 실패: ' + String(err);
+        }
+      });
+
+      document.getElementById('fillExample').addEventListener('click', async () => {
+        fillOutput.textContent = '채우는 중...';
+        const payload = {
+          name: document.getElementById('name').value,
+          department: document.getElementById('department').value,
+          date: document.getElementById('date').value,
+          notes: document.getElementById('notes').value,
+        };
+        try {
+          const res = await fetch('http://localhost:4000/templates/example-form/fill', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          const json = await res.json();
+          fillOutput.textContent = JSON.stringify(json, null, 2);
+        } catch (err) {
+          fillOutput.textContent = 'API 호출 실패: ' + String(err);
+        }
+      });
+
+      document.getElementById('mountRhwp').addEventListener('click', async () => {
+        rhwpOutput.textContent = 'rhwp editor 초기화 중...';
+        try {
+          if (editor) editor.destroy();
+          editor = await createRhwpEditor(editorHost);
+          rhwpOutput.textContent = 'rhwp editor 초기화 완료';
+        } catch (err) {
+          rhwpOutput.textContent = 'rhwp 초기화 실패: ' + String(err);
+        }
+      });
+
+      document.getElementById('loadPreviewDoc').addEventListener('click', async () => {
+        rhwpOutput.textContent = 'preview 문서 생성 중...';
+        try {
+          if (!editor) {
+            editor = await createRhwpEditor(editorHost);
+          }
+          const res = await fetch('http://localhost:4000/templates/example-form/fill', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              name: document.getElementById('name').value,
+              department: document.getElementById('department').value,
+              date: document.getElementById('date').value,
+              notes: document.getElementById('notes').value,
+            })
+          });
+          const json = await res.json();
+          const result = await editor.loadTextAsFile(json.filledPreview || 'preview', 'preview.txt');
+          rhwpOutput.textContent = 'rhwp 로드 결과: ' + JSON.stringify(result, null, 2);
+        } catch (err) {
+          rhwpOutput.textContent = 'rhwp 로드 실패: ' + String(err);
+        }
+      });
+    </script>
+  </body>
+</html>

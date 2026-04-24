@@ -1,0 +1,12 @@
+{
+  "name": "airportmc-hwp-skill-platform",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.33.0",
+  "scripts": {
+    "build": "echo build targets pending",
+    "dev:web": "echo web client pending",
+    "dev:api": "echo server api pending",
+    "dev:desktop": "echo desktop client pending"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "placeholders": {
+    "name": "{{성명}}",
+    "department": "{{부서}}",
+    "date": "{{일자}}",
+    "notes": "{{비고}}"
+  }
+}
